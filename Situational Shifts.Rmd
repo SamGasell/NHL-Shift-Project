@@ -1,0 +1,431 @@
+---
+title: "Situational Shift"
+author: "Sam Gasell"
+date: "10/4/2020"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+For inputted shifts, calculates average shift time 
+```{r}
+averageShifts <- function(shifts){
+  
+  #filters the data to a team's shifts in a game and converts the duration of each shift to seconds
+  if(nrow(shifts)>0){
+  teamShifts <- filter(shifts, !is.na(duration))
+  teamShifts <- teamShifts %>% rowwise() %>% mutate(durationSecs = as.numeric(str_split(duration, ":")[[1]][1])*60 + as.numeric(str_split(duration, ":")[[1]][2]))
+  
+  ##calculates average shift in seconds
+  avShift <- sum(teamShifts$durationSecs)/nrow(teamShifts)
+  
+  return(avShift)
+  }
+  else{
+    return(0)
+  }
+}
+
+```
+
+Calculates total shift time across inputted shifts
+```{r}
+sumShifts <- function(shifts){
+  
+  #filters the data to a team's shifts in a game and converts the duration of each shift to seconds
+  if(nrow(shifts)>0){
+  teamShifts <- filter(shifts, !is.na(duration))
+  teamShifts <- teamShifts %>% rowwise() %>% mutate(durationSecs = as.numeric(str_split(duration, ":")[[1]][1])*60 + as.numeric(str_split(duration, ":")[[1]][2]))
+  
+  ##calculates sum of all shifts in seconds
+  sumShift <- sum(teamShifts$durationSecs)
+  
+  return(sumShift)
+  }
+  else{
+    return(0)
+  }
+}
+
+```
+
+Calculates number of shifts across inputted shifts
+```{r}
+numShifts <- function(shifts){
+  if(!is.na(nrow(shifts))){
+    return(nrow(shifts))
+  }
+  else{
+    return(0)
+  }
+}
+```
+
+
+
+Calculates how many players are on the ice for each team during each substitution and how long the manpower has stayed the same within the game
+```{r}
+playersOnIce <- function(game, team1, team2){
+  g <- extractShiftData(game)
+  g1 <- g  %>% filter(teamName == team1 & !is.na(endTimeSec)) %>% arrange(startTimeSec) 
+  g1 <- g1 %>% mutate(numSubbedIn = table(g1$startTimeSec)[names(table(g1$startTimeSec)) == startTimeSec]) %>% mutate(numSubbedOut = table(g1$endTimeSec)[names(table(g1$endTimeSec)) == endTimeSec]) #calculates how many platers subbed in and out at given second during game for team1
+
+g2 <- g  %>% filter(teamName == team2 & !is.na(endTimeSec)) %>% arrange(startTimeSec)
+g2 <- g2 %>% mutate(numSubbedIn = table(g2$startTimeSec)[names(table(g2$startTimeSec)) == startTimeSec]) %>% mutate(numSubbedOut = table(g2$endTimeSec)[names(table(g2$endTimeSec)) == endTimeSec]) #calculates how many platers subbed in and out at given second during game for team2
+
+time = sort(unique(c(g1$startTimeSec,g$endTimeSec, g2$startTimeSec, g2$endTimeSec))) #gets unique times where substitutions occur
+playersOn = c()
+playersOn2 = c()
+players = 0
+players2 = 0
+
+#loops through sub times to find how many players are subbed on and off at that second
+  for(j in 1:length(time)){
+    if(time[j] %in% g1$startTimeSec){
+    subIn <- filter(g1, startTimeSec == time[j])
+    players = players + subIn$numSubbedIn[1]
+  }
+    if(time[j] %in% g1$endTimeSec){
+    subOut <- filter(g1, endTimeSec == time[j])
+    players = players - subOut$numSubbedOut[1]
+    }
+    if(time[j] %in% g2$startTimeSec){
+    subIn2 <- filter(g2, startTimeSec == time[j])
+    players2 = players2 + subIn2$numSubbedIn[1]
+  }
+    if(time[j] %in% g2$endTimeSec){
+    subOut2 <- filter(g2, endTimeSec == time[j])
+    players2 = players2 - subOut2$numSubbedOut[1]
+    }
+    playersOn <- c(playersOn, players)
+    playersOn2 <- c(playersOn2, players2)
+  }
+
+#for comparison, creates lagged number of players on ice for each team, and adjusts to make sure 6 players are on and time is 0 at beginning
+lagPO <- lag(playersOn)
+lagPO[1] <- 6
+lagPO2 <- lag(playersOn2)
+lagPO2[1] <- 6
+lagTime <- lag(time)
+lagTime[1] <- 0
+
+len <- length(time)
+ts=0
+timeSame <- c(0)
+
+#loops through sub times to see when manpower changes during a substitution, creates running total for how long manpower has remained the same
+for(k in 1:(len-1)){
+if(((playersOn[k] == lagPO[k]) & (playersOn2[k] == lagPO2[k])) & !is.na((playersOn[k] == lagPO[k]) & (playersOn2[k] == lagPO2[k]))){
+  ts = ts + (time[k+1] - lagTime[k+1])
+}
+  else{
+    ts =  (time[k+1] - lagTime[k+1])
+  }
+  timeSame <- c(timeSame, ts)
+}
+po <- data.frame(time,playersOn, playersOn2, timeSame)
+
+return(po)
+}
+playersOnIce(2019030412, "Dallas Stars", "Tampa Bay Lightning")
+```
+
+
+
+Creates game summary for a team for how long a team experienced a certain man power during a game and their average shift length during that man power
+```{r}
+avShiftGame <- function(game, team1, team2){
+  g <- extractShiftData(game)
+  g1 <- g  %>% filter(teamName == team1)
+  g2 <- g  %>% filter(teamName == team2)
+  po <- playersOnIce(game,team1,team2) #uses function to calculate how many players are on the ice at any given second during the game
+  ch <- filter(po, lead(timeSame) <= timeSame | time == 0 | time == max(time)) #filters po to where the manpower changes during a game
+  
+  #initializes shift data frames and time values for each manpower
+  so61 <- data.frame()
+  sixOnSix1 <- data.frame()
+  so62 <- data.frame()
+  sixOnSix2 <- data.frame()
+  time6o6 <- 0
+  fo51 <- data.frame()
+  fiveOnFive1 <- data.frame()
+  fo52 <- data.frame()
+  fiveOnFive2 <- data.frame()
+  time5o5 <- 0
+  ro41 <- data.frame()
+  fourOnFour1 <- data.frame()
+  ro42 <- data.frame()
+  fourOnFour2 <- data.frame()
+  time4o4 <- 0
+  sof1 <- data.frame()
+  sixOnFive1 <- data.frame()
+  sof2 <- data.frame()
+  sixOnFive2 <- data.frame()
+  time6o5 <-0 
+  fo41 <- data.frame()
+  fiveOnFour1 <- data.frame()
+  fo42 <- data.frame()
+  fiveOnFour2 <- data.frame()
+  time5o4 <- 0 
+  so41 <- data.frame()
+  sixOnFour1 <- data.frame()
+  so42 <- data.frame()
+  sixOnFour2 <- data.frame()
+  time6o4 <- 0
+  fo61 <- data.frame()
+  fiveOnSix1 <- data.frame()
+  fo62 <- data.frame()
+  fiveOnSix2 <- data.frame()
+  time5o6 <- 0
+  ro51 <- data.frame()
+  fourOnFive1 <- data.frame()
+  ro52 <- data.frame()
+  fourOnFive2 <- data.frame()
+  time4o5 <-0
+  ro61 <- data.frame()
+  fourOnSix1 <- data.frame()
+  ro62 <- data.frame()
+  fourOnSix2 <- data.frame()
+  time4o6<-0
+  
+  start = 0 #initializes start to zero
+  #loops through the changes in manpower to filter out the shifts that start during that interval and are less than 5 minutes (to eliminate goalies) also continually sums how much time the team spent at that manpower
+for(n in 1:length(ch$time)){
+      if(ch$playersOn[n] == 6 & ch$playersOn2[n] == 6){
+        so61 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        so62 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        sixOnSix1 <- rbind(sixOnSix1, so61)
+        sixOnSix2 <- rbind(sixOnSix2, so62)
+        time6o6 <- time6o6 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 5 & ch$playersOn2[n] == 5){
+        fo51 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fo52 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fiveOnFive1 <- rbind(fiveOnFive1, fo51)
+        fiveOnFive2 <- rbind(fiveOnFive2, fo52)
+        time5o5 <- time5o5 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 4 & ch$playersOn2[n] == 4){
+        ro41 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        ro42 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fourOnFour1 <- rbind(fourOnFour1, ro41)
+        fourOnFour2 <- rbind(fourOnFour2, ro42)
+        time4o4 <- time4o4 + ch$timeSame[n+1]
+      }
+      
+      else if(ch$playersOn[n] == 6 & ch$playersOn2[n] == 5){
+        so51 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        so52 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        sixOnFive1 <- rbind(sixOnFive1, so51)
+        sixOnFive2 <- rbind(sixOnFive2, so52)
+        time6o5 <- time6o5 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 5 & ch$playersOn2[n] == 4){
+        fo41 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fo42 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fiveOnFour1 <- rbind(fiveOnFour1, fo41)
+        fiveOnFour2 <- rbind(fiveOnFour2, fo42)
+        time5o4 <- time5o4 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 6 & ch$playersOn2[n] == 4){
+        so41 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        so42 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        sixOnFour1 <- rbind(fourOnFive1, so41)
+        sixOnFour2 <- rbind(fourOnFive2, so42)
+        time6o4 <- time6o4 + ch$timeSame[n+1]
+      }
+      
+      else if(ch$playersOn[n] == 5 & ch$playersOn2[n] == 6){
+        fo61 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fo62 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fiveOnSix1 <- rbind(fiveOnSix1, fo61)
+        fiveOnSix2 <- rbind(fiveOnSix2, fo62)
+        time5o6 <- time5o6 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 4 & ch$playersOn2[n] == 5){
+        ro51 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        ro52 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fourOnFive1 <- rbind(fourOnFive1, ro51)
+        fourOnFive2 <- rbind(fourOnFive2, ro52)
+        time4o5 <- time4o5 + ch$timeSame[n+1]
+      }
+      else if(ch$playersOn[n] == 4 & ch$playersOn2[n] == 6){
+        ro61 <- filter(g1, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        ro62 <- filter(g2, startTimeSec >= ch$time[n] & startTimeSec <= ch$time[n+1] & durationSecs < 300)
+        fourOnSix1 <- rbind(fourOnSix1, ro61)
+        fourOnSix2 <- rbind(fourOnSix2, ro62)
+        time4o6 <- time4o6 + ch$timeSame[n+1]
+      }
+      
+      start = changes$time[n]
+}
+  #gets total shift times and total number of shiftsfor each team's manpower situatioion and creates dataframe to be exported
+  t6o61 <- sumShifts(sixOnSix1)
+  t5o51 <- sumShifts(fiveOnFive1)
+  t4o41 <- sumShifts(fourOnFour1)
+  t6o51 <- sumShifts(sixOnFive1)
+  t5o41 <- sumShifts(fiveOnFour1)
+  t6o41 <- sumShifts(sixOnFour1)
+  t5o61 <- sumShifts(fiveOnSix1)
+  t4o51 <- sumShifts(fourOnFive1)
+  t4o61 <- sumShifts(fourOnSix1)
+  s6o61 <- numShifts(sixOnSix1)
+  s5o51 <- numShifts(fiveOnFive1)
+  s4o41 <- numShifts(fourOnFour1)
+  s6o51 <- numShifts(sixOnFive1)
+  s5o41 <- numShifts(fiveOnFour1)
+  s6o41 <- numShifts(sixOnFour1)
+  s5o61 <- numShifts(fiveOnSix1)
+  s4o51 <- numShifts(fourOnFive1)
+  s4o61 <- numShifts(fourOnSix1)
+  t6o62 <- sumShifts(sixOnSix2)
+  t5o52 <- sumShifts(fiveOnFive2)
+  t4o42 <- sumShifts(fourOnFour2)
+  t6o52 <- sumShifts(sixOnFive2)
+  t5o42 <- sumShifts(fiveOnFour2)
+  t6o42 <- sumShifts(sixOnFour2)
+  t5o62 <- sumShifts(fiveOnSix2)
+  t4o52 <- sumShifts(fourOnFive2)
+  t4o62 <- sumShifts(fourOnSix2)
+  s6o62 <- numShifts(sixOnSix2)
+  s5o52 <- numShifts(fiveOnFive2)
+  s4o42 <- numShifts(fourOnFour2)
+  s6o52 <- numShifts(sixOnFive2)
+  s5o42 <- numShifts(fiveOnFour2)
+  s6o42 <- numShifts(sixOnFour2)
+  s5o62 <- numShifts(fiveOnSix2)
+  s4o52 <- numShifts(fourOnFive2)
+  s4o62 <- numShifts(fourOnSix2)
+  gameStats <- data.frame(game, team1, team2,time6o6,time5o5,time4o4,time6o5,time5o4,time6o4,time5o6,time4o5,time4o6, t6o61,s6o61,t5o51,s5o51,t4o41,s4o41,t6o51,s6o51,t5o41,s5o41,t6o41,s6o41,t5o61,s5o61,t4o51,s4o51,t4o61,s4o61,
+t6o62,s6o62,t5o52,s5o52,t4o42,s4o42,t6o52,s6o52,t5o42,s5o42,t6o42,s6o42,t5o62,s5o62,t4o52,s4o52,t4o62,s4o62 )
+  return(gameStats)
+
+}
+avShiftGame(2019030414, "Tampa Bay Lightning","Dallas Stars")
+
+```
+
+For a certain date range, gets all games' average shift data *Takes a while to run
+```{r}
+avShiftStats <- function(startDate, endDate){
+  #Gets schedule data for desired games
+someGames <- getGameInfo2(startDate, endDate)
+ss <- data.frame()
+ shiftStats <- data.frame()
+#loops through each game to get its average shift data
+for(g in 1:nrow(someGames)){
+  id <- someGames$ID[g]
+  away <- someGames$awayTeam[g]
+  home <- someGames$homeTeam[g]
+  ss <- avShiftGame(id, away, home)
+  shiftStats <- rbind(shiftStats, ss)
+}
+ return(shiftStats)
+}
+
+avShiftStats(startDate = "2019-10-02", endDate = "2019-10-03")
+```
+
+Gets all of the average shift data for the all games in the 2019-2020 regular season, and writes them to csv
+*Takes a while to run
+```{r}
+allShiftStats1 <- avShiftStats(startDate = "2019-10-02", endDate = "2019-12-08") #data from 2019-10-02 to 2019-12-08
+allShiftStats2 <- avShiftStats(startDate = "2019-12-09", endDate = "2010-01-22")#data from 2019-12-08 to 2020-01-22
+allShiftStats3 <- avShiftStats(startDate = "2020-01-23", endDate = "2010-03-11")#data from 2020-01-23 to 2020-03-11
+
+allShiftStats1920 <- rbind(allShiftStats1,allShiftStats2,allShiftStats3)
+
+write_csv(allShiftStats1920, path = "/Users/samgasell/Documents/Hockey/Average Shift Stats 19-20.csv")
+```
+
+```{r}
+nhlTeams <- c("Washington Capitals", "Philadelphia Flyers", "Pittsburgh Penguins", "Carolina Hurricanes", "Columbus Blue Jackets", "New York Islanders", "New York Rangers", "New Jersey Devils","Boston Bruins", "Tampa Bay Lightning", "Toronto Maple Leafs", "Florida Panthers", "Montréal Canadiens", "Buffalo Sabres", "Ottawa Senators", "Detroit Red Wings","St. Louis Blues", "Colorado Avalanche", "Dallas Stars", "Winnipeg Jets", "Nashville Predators", "Minnesota Wild", "Chicago Blackhawks","Vegas Golden Knights", "Edmonton Oilers", "Calgary Flames", "Vancouver Canucks", "Arizona Coyotes", "Anaheim Ducks", "Los Angeles Kings", "San Jose Sharks")
+
+nhlAbbs <- c("WSH", "PHI", "PIT", "CAR", "CBJ", "NYI", "NYR", "NJ", "BOS", "TB", "TOR", "FLA", "MTL", "BUF", "OTT", "DET", "STL", "COL", "DAL","WPG","NSH", "MIN","CHI","VGK","EDM","CGY","VAN","ARI","ANA","LA","SJ")
+```
+
+Getting all necessary stats for each team
+```{r}
+tts <- data.frame()
+totalTeamStats1920 <- data.frame()
+for(t in 1:length(nhlTeams)){
+  team <- nhlTeams[t]
+  teamAbb <- nhlAbbs[t]
+  teamStats1 <- filter(allShiftStats1920, team1 == team)
+  teamStats2 <- filter(allShiftStats1920, team2 == team)
+  totalTime6o6 <- sum(teamStats1$time6o6, teamStats2$time6o6)
+  totalTime5o5 <- sum(teamStats1$time5o5, teamStats2$time5o5)
+  totalTime4o4 <- sum(teamStats1$time4o4, teamStats2$time4o4)
+  totalTime6o5 <- sum(teamStats1$time6o5, teamStats2$time5o6)
+  totalTime5o4 <- sum(teamStats1$time5o4, teamStats2$time4o5)
+  totalTime6o4 <- sum(teamStats1$time6o4, teamStats2$time4o6)
+  totalTime5o6 <- sum(teamStats1$time5o6, teamStats2$time6o5)
+  totalTime4o5 <- sum(teamStats1$time4o5, teamStats2$time5o4)
+  totalTime4o6 <- sum(teamStats1$time4o6, teamStats2$time6o4)
+  
+  t6o6 <- sum(teamStats1$t6o61, teamStats2$t6o62)
+  t5o5 <- sum(teamStats1$t5o51, teamStats2$t5o52)
+  t4o4 <- sum(teamStats1$t4o41, teamStats2$t4o42)
+  t6o5 <- sum(teamStats1$t6o51, teamStats2$t5o62)
+  t5o4 <- sum(teamStats1$t5o41, teamStats2$t4o52)
+  t6o4 <- sum(teamStats1$t6o41, teamStats2$t4o62)
+  t5o6 <- sum(teamStats1$t5o61, teamStats2$t6o52)
+  t4o5 <- sum(teamStats1$t4o51, teamStats2$t5o42)
+  t4o6 <- sum(teamStats1$t4o61, teamStats2$t6o42)
+  
+  s6o6 <- sum(teamStats1$s6o61, teamStats2$s6o62)
+  s5o5 <- sum(teamStats1$s5o51, teamStats2$s5o52)
+  s4o4 <- sum(teamStats1$s4o41, teamStats2$s4o42)
+  s6o5 <- sum(teamStats1$s6o51, teamStats2$s5o62)
+  s5o4 <- sum(teamStats1$s5o41, teamStats2$s4o52)
+  s6o4 <- sum(teamStats1$s6o41, teamStats2$s4o62)
+  s5o6 <- sum(teamStats1$s5o61, teamStats2$s6o52)
+  s4o5 <- sum(teamStats1$s4o51, teamStats2$s5o42)
+  s4o6 <- sum(teamStats1$s4o61, teamStats2$s6o42)
+  
+  tts <- data.frame(team, teamAbb, totalTime6o6, totalTime5o5, totalTime4o4, totalTime6o5, totalTime5o4, totalTime6o4, totalTime5o6, totalTime4o5,totalTime4o6,
+             t6o6, s6o6,t5o5, s5o5,t4o4, s4o4,t6o5, s6o5,t5o4, s5o4,t6o4, s6o4,t5o6, s5o6,t4o5, s4o5,t4o6, s4o6)
+  totalTeamStats1920 <- rbind(totalTeamStats1920, tts)
+}
+
+totalTeamStats1920 <- mutate(totalTeamStats1920, a6o6 = t6o6/s6o6, a5o5= t5o5/s5o5, a4o4 = t4o4/s4o4, a6o5 = t6o5/s6o5,a5o4 = t5o4/s5o4,
+                             a6o4 = t6o4/s6o4,a5o6 = t5o6/s5o6,a4o5 = t4o5/s4o5,a4o6 = t4o6/s4o6)
+```
+
+Getting NHL Goals against/for data for each team at different strengths
+```{r}
+gaData1920 <- readxl::read_xlsx("/Users/samgasell/Documents/Hockey/Goals Against by Strength 19-20.xlsx")
+gfData1920 <- readxl::read_xlsx("/Users/samgasell/Documents/Hockey/Goals For by Strength 19-20.xlsx")
+
+gaData1920 <- gaData1920 %>% arrange(Team) %>% select(starts_with("GA ")) %>% select(!starts_with("GA 6")) %>% select(!ends_with("6")) %>% rename(GA6o6 = "GA 5v5", GA5o5 = "GA 4v4", GA4o4 = "GA 3v3", GA6o5 = "GA 5v4", GA5o4 = "GA 4v3", GA6o4 = "GA 5v3", GA5o6 = "GA 4v5", GA4o5 = "GA 3v4", GA4o6 = "GA 3v5") 
+gfData1920 <- gfData1920 %>% arrange(Team) %>% select(starts_with("GF ")) %>% select(!starts_with("GF 6")) %>% select(!ends_with("6")) %>% rename(GF6o6 = "GF 5v5", GF5o5 = "GF 4v4", GF4o4 = "GF 3v3", GF6o5 = "GF 5v4", GF5o4 = "GF 4v3", GF6o4 = "GF 5v3", GF5o6 = "GF 4v5", GF4o5 = "GF 3v4", GF4o6 = "GF 3v5")
+
+totalTeamStats1920 <- arrange(totalTeamStats1920, as.character(team))
+totalTeamStats1920 <- cbind(totalTeamStats1920, gaData1920, gfData1920)
+
+write_csv(allShiftStats1920, path = "/Users/samgasell/Documents/Hockey/Shift Stats by Team 19-20.csv")
+```
+
+Sample 5 random games and check PlayersOnIce
+```{r}
+samp <- sample(allShiftStats1920$game[1]:allShiftStats1920$game[length(allShiftStats1920$game)], 5)
+#2019020866, 2019020350, 2019020904, 20190020311, 2019021041
+
+game1 <- filter(allShiftStats1920, game == samp[1])
+game1POI <- playersOnIce(samp[1], game1$team1[1], game1$team2[1])
+
+game2 <- filter(allShiftStats1920, game == samp[2])
+game2POI <- playersOnIce(samp[2], game2$team1[1], game2$team2[1])
+
+game3 <- filter(allShiftStats1920, game == samp[3])
+game3POI <- playersOnIce(samp[3], game3$team1[1], game3$team2[1]) #13 second glitch at 1360
+
+game4 <- filter(allShiftStats1920, game == samp[4]) #OT, 27 secs
+game4POI <- playersOnIce(samp[4], game4$team1[1], game4$team2[1])
+
+game5 <- filter(allShiftStats1920, game == samp[5]) #1 second glitch at 632, 12 second glitch at 1998, Full OT
+game5POI <- playersOnIce(samp[5], game5$team1[1], game5$team2[1])
+```
