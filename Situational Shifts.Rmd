@@ -177,7 +177,7 @@ avShiftGame <- function(game, team1, team2){
   time6o4 <- 0
   fo61 <- data.frame()
   fiveOnSix1 <- data.frame()
-  fo62 <- data.frame()
+  fo62 <- data.frame() 
   fiveOnSix2 <- data.frame()
   time5o6 <- 0
   ro51 <- data.frame()
