@@ -133,8 +133,6 @@ return(po)
 playersOnIce(2019030412, "Dallas Stars", "Tampa Bay Lightning")
 ```
 
-
-
 Creates game summary for a team for how long a team experienced a certain man power during a game and their average shift length during that man power
 ```{r}
 avShiftGame <- function(game, team1, team2){
@@ -177,7 +175,7 @@ avShiftGame <- function(game, team1, team2){
   time6o4 <- 0
   fo61 <- data.frame()
   fiveOnSix1 <- data.frame()
-  fo62 <- data.frame() 
+  fo62 <- data.frame()
   fiveOnSix2 <- data.frame()
   time5o6 <- 0
   ro51 <- data.frame()
@@ -397,6 +395,7 @@ totalTeamStats1920 <- mutate(totalTeamStats1920, a6o6 = t6o6/s6o6, a5o5= t5o5/s5
 
 Getting NHL Goals against/for data for each team at different strengths
 ```{r}
+#Update with your own file path for each file
 gaData1920 <- readxl::read_xlsx("/Users/samgasell/Documents/Hockey/Goals Against by Strength 19-20.xlsx")
 gfData1920 <- readxl::read_xlsx("/Users/samgasell/Documents/Hockey/Goals For by Strength 19-20.xlsx")
 
@@ -406,7 +405,8 @@ gfData1920 <- gfData1920 %>% arrange(Team) %>% select(starts_with("GF ")) %>% se
 totalTeamStats1920 <- arrange(totalTeamStats1920, as.character(team))
 totalTeamStats1920 <- cbind(totalTeamStats1920, gaData1920, gfData1920)
 
-write_csv(allShiftStats1920, path = "/Users/samgasell/Documents/Hockey/Shift Stats by Team 19-20.csv")
+#Update with your own file path
+write_csv(totalTeamStats1920, path = "/Users/samgasell/Documents/Hockey/Shift Stats by Team 19-20.csv")
 ```
 
 Sample 5 random games and check PlayersOnIce
@@ -429,3 +429,4 @@ game4POI <- playersOnIce(samp[4], game4$team1[1], game4$team2[1])
 game5 <- filter(allShiftStats1920, game == samp[5]) #1 second glitch at 632, 12 second glitch at 1998, Full OT
 game5POI <- playersOnIce(samp[5], game5$team1[1], game5$team2[1])
 ```
+
