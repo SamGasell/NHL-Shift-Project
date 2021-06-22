@@ -5,144 +5,227 @@ date: "1/30/2021"
 output: html_document
 ---
 
-Combine 6on5 and 5on6 with 5on4 and 4on5
+Read in data generated from Situational Shifts.Rmd
 
 ```{r}
 library(tidyverse)
+
+#Replace with own file path
+totalTeamStats1920 <- read_csv("/Users/samgasell/Documents/Hockey/Shift Stats by Team 19-20.csv")
+
+#Combine 6on5 and 5on6 data with 5on4 and 4on5, respectively. This is because many teams do not have enough shifts in 4on5 or 5on4 situations, so combines to categorize when teams have a 1 skater advantage or deficit.
 totalTeamStats1920 <- totalTeamStats1920 %>% mutate(totalTime1Up = totalTime6o5 + totalTime5o4) %>%     mutate(totalTime1Down = totalTime5o6 + totalTime4o5) %>% mutate(t1Up = t6o5 + t5o4) %>% mutate(t1Down = t5o6 + t4o5) %>% mutate(s1Up = s6o5 + s5o4) %>% mutate(s1Down = s5o6 + s4o5) %>% mutate(GA1Up = GA6o5 + GA5o4) %>% mutate(GA1Down = GA5o6 + GA4o5) %>% mutate(GF1Up = GF6o5 + GF5o4) %>% mutate(GF1Down = GF5o6 + GF4o5) %>% mutate(a1Up = t1Up/s1Up) %>% mutate(a1Down = t1Down/s1Down)
 ```
-Goals For
 
-Sig
+Regression and plots representing the Poisson regression between average shift time and offensive scoring rate in each manpower situation.
+
+6-on-6 -- Significant
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a6o6, y = log(GF6o6/(totalTime6o6/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+#Poisson regression
 poiFit6o6GF <- glm(GF6o6 ~ offset(log(totalTime6o6/(60*60))) + a6o6, data = totalTeamStats1920, family = "poisson")
 
-ggplot(totalTeamStats1920, aes(x = a6o6, y = GF6o6/(totalTime6o6/(60*60)), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', formula = (y ~ exp(x)),  se = FALSE) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a6o6, y = log(GF6o6/(totalTime6o6/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
 
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a6o6, y = GF6o6/(totalTime6o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit6o6GF$coefficients[1] + poiFit6o6GF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
 
-ggplot(totalTeamStats1920, aes(x = a6o6, y = GF6o6/(totalTime6o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(0.048196 + 0.019388*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
-
+#Summary of regression
 summary(poiFit6o6GF)
 ```
-
+5-on-5 
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a5o5, y = log(GF5o5/(totalTime5o5/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit5o5GF <- glm(GF5o5 ~ offset(log(totalTime5o5/(60*60))) + a5o5, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a5o5, y = log(GF5o5/(totalTime5o5/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "5-on-5 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a5o5, y = GF5o5/(totalTime5o5/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit5o5GF$coefficients[1] + poiFit5o5GF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "5-on-5 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit5o5GF)
 ```
-
+4-on-4
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a4o4, y = log(GF4o4/(totalTime4o4/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit4o4GF <- glm(GF4o4 ~ offset(log(totalTime4o4/(60*60))) + a4o4, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a4o4, y = log(GF4o4/(totalTime4o4/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "4-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a4o4, y = GF4o4/(totalTime4o4/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit4o4GF$coefficients[1] + poiFit4o4GF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "4-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit4o4GF)
 ```
 
+1 Player Advantage
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a1Up, y = log(GF1Up/(totalTime1Up/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit1UpGF <- glm(GF1Up ~ offset(log(totalTime1Up/(60*60))) + a1Up, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a1Up, y = log(GF1Up/(totalTime1Up/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a1Up, y = GF1Up/(totalTime1Up/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit1UpGF$coefficients[1] + poiFit1UpGF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit1UpGF)
 ```
 
-
+6-on-4
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a6o4, y = log(GF6o4/(totalTime6o4/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit6o4GF <- glm(GF6o4 ~ offset(log(totalTime6o4/(60*60))) + a6o4, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a6o4, y = log(GF6o4/(totalTime6o4/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "6-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a6o4, y = GF6o4/(totalTime6o4/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit6o4GF$coefficients[1] + poiFit6o4GF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "6-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit6o4GF)
 ```
-Sig
+
+1 Player Disadvantage -- Significant
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a1Down, y = log(GF1Down/(totalTime1Down/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
-
-ggplot(totalTeamStats1920, aes(x = a1Down, y = GF1Down/(totalTime1Down/(60*60)), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm',formula = y~ exp(-x), se = FALSE) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
-
-ggplot(totalTeamStats1920, aes(x = a1Down, y = GF1Down/(totalTime1Down/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(3.25586  + -0.07467*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
-
+#Poisson regression
 poiFit1DownGF <- glm(GF1Down ~ offset(log(totalTime1Down/(60*60))) + a1Down, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a1Down, y = log(GF1Down/(totalTime1Down/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a1Down, y = GF1Down/(totalTime1Down/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit1DownGF$coefficients[1] + poiFit1DownGF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit1DownGF)
 ```
 
 
-
+4-on-6
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a4o6, y = log(GF4o6/(totalTime4o6/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit4o6GF <- glm(GF4o6 ~ offset(log(totalTime4o6/(60*60))) + a4o6, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a4o6, y = log(GF4o6/(totalTime4o6/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Scored per 60 Minutes by Team", subtitle = "4-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Scored/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a4o6, y = GF4o6/(totalTime4o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit4o6GF$coefficients[1] + poiFit4o6GF$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Scored per 60 Minutes by Team", subtitle = "4-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
+
+#Summary of regression
 summary(poiFit4o6GF)
 ```
 
 
 Goals Allowed
+
+6-on-6
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a6o6, y = log(GA6o6/(totalTime6o6/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
+#Poisson regression
 poiFit6o6GA <- glm(GA6o6 ~ offset(log(totalTime6o6/(60*60))) + a6o6, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a6o6, y = log(GA6o6/(totalTime6o6/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a6o6, y = GA6o6/(totalTime6o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit6o6GA$coefficients[1] + poiFit6o6GA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "6-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit6o6GA)
 ```
-
+5-on-5 
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a5o5, y = log(GA5o5/(totalTime5o5/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit5o5GA <- glm(GA5o5 ~ offset(log(totalTime5o5/(60*60))) + a5o5, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a5o5, y = log(GA5o5/(totalTime5o5/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "5-on-5 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a5o5, y = GA5o5/(totalTime5o5/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit5o5GA$coefficients[1] + poiFit5o5GA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "5-on-5 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit5o5GA)
 ```
-
+4-on-4
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a4o4, y = log(GA4o4/(totalTime4o4/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit4o4GA <- glm(GA4o4 ~ offset(log(totalTime4o4/(60*60))) + a4o4, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a4o4, y = log(GA4o4/(totalTime4o4/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "4-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a4o4, y = GA4o4/(totalTime4o4/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit4o4GA$coefficients[1] + poiFit4o4GA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "4-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit4o4GA)
 ```
-Sig
+
+1 Player Advantage - Significant
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a1Up, y = log(GA1Up/(totalTime1Up/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)") 
-
-ggplot(totalTeamStats1920, aes(x = a1Up, y = GA1Up/(totalTime1Up/(60*60)), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', formula = y~exp(x), se = FALSE) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes") 
-
-ggplot(totalTeamStats1920, aes(x = a1Up, y = GA1Up/(totalTime1Up/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(-3.02107  + 0.05466*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
-
+#Poisson regression
 poiFit1UpGA <- glm(GA1Up ~ offset(log(totalTime1Up/(60*60))) + a1Up, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a1Up, y = log(GA1Up/(totalTime1Up/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a1Up, y = GA1Up/(totalTime1Up/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit1UpGA$coefficients[1] + poiFit1UpGA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Advantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit1UpGA)
 ```
 
+6-on-4
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a6o4, y = log(GA6o4/(totalTime6o4/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE)
-
+#Poisson regression
 poiFit6o4GA <- glm(GA6o4 ~ offset(log(totalTime6o4/(60*60))) + a6o4, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a6o4, y = log(GA6o4/(totalTime6o4/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "6-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a6o4, y = GA6o4/(totalTime6o4/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit6o4GA$coefficients[1] + poiFit6o4GA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "6-on-4 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit6o4GA)
 ```
 
+1 Player Disadvantage
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a1Down, y = log(GA1Down/(totalTime1Down/(60*60))), label=teamAbb)) +  geom_label()
-
+#Poisson regression
 poiFit1DownGA <- glm(GA1Down ~ offset(log(totalTime1Down/(60*60))) + a1Down, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a1Down, y = log(GA1Down/(totalTime1Down/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a1Down, y = GA1Down/(totalTime1Down/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit1DownGA$coefficients[1] + poiFit1DownGA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "1 Player Disadvantage, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit1DownGA)
 ```
 
-Sig
+
+4-on-6 - Significant
 ```{r}
-ggplot(totalTeamStats1920, aes(x = a4o6, y = log(GA4o6/(totalTime4o6/(60*60))), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "4-on-6, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)") 
-
-ggplot(totalTeamStats1920, aes(x = a4o6, y = GA4o6/(totalTime4o6/(60*60)), label=teamAbb)) +  geom_label()+ geom_smooth(method = 'lm', formula = y~exp(-x), se = FALSE) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "4-on-6, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes") 
-
-ggplot(totalTeamStats1920, aes(x = a4o6, y = GA4o6/(totalTime4o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(5.11752  + -0.07452*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "4-on-6, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Scored/60 Minutes")
-
+#Poisson regression
 poiFit4o6GA <- glm(GA4o6 ~ offset(log(totalTime4o6/(60*60))) + a4o6, data = totalTeamStats1920, family = "poisson")
 
+#Plot of log of scoring rate versus average shift time with linear regression
+ggplot(totalTeamStats1920, aes(x = a4o6, y = log(GA4o6/(totalTime4o6/(60*60))), label=teamAbb)) +  geom_label() + geom_smooth(method = 'lm', se = FALSE) + labs(title="Average Shift Time vs. Logarithm of Goals Allowed per 60 Minutes by Team", subtitle = "4-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "log(Goals Allowed/60 Minutes)")
+
+#Plot of the scoring rate versus average shift time with exponential regression
+ggplot(totalTeamStats1920, aes(x = a4o6, y = GA4o6/(totalTime4o6/(60*60)), label=teamAbb)) +  geom_label() + stat_function(fun = function(x) exp(poiFit4o6GA$coefficients[1] + poiFit4o6GA$coefficients[2]*x), color = 'blue', size = 1.3) + labs(title="Average Shift Time vs. Goals Allowed per 60 Minutes by Team", subtitle = "4-on-6 Manpower, 2019-2020 NHL Regular season", x = "Average Shift Time (Seconds)", y = "Goals Allowed/60 Minutes")
+
+#Summary of regression
 summary(poiFit4o6GA)
 ```
